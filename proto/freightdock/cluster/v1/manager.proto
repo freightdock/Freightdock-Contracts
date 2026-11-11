@@ -1,0 +1,100 @@
+// The contract between managers. Served on the same port as the worker API (7450), with mutual TLS: the caller shows a
+// manager certificate (its common name `manager:<raft id>`, which the cluster CA gives only to managers), so a
+// worker's certificate opens nothing here.
+//
+// Raft's own messages are carried as opaque JSON of the consensus library's types: they belong to the manager's
+// implementation, not to this contract, and change with it. What is fixed here is who may call and how a call is
+// addressed.
+
+syntax = "proto3";
+
+package freightdock.cluster.v1;
+
+import "freightdock/cluster/v1/worker.proto";
+
+service ManagerPeer {
+  // One Raft RPC to the manager whose Raft node id is `target`. A manager refuses a call addressed to another id, so a
+  // message never reaches the wrong manager after an address changes hands.
+  rpc Raft(RaftRequest) returns (RaftReply);
+  // A follower hands a change to the leader to commit. The entry is the manager's own log entry, as JSON.
+  rpc Propose(ProposeRequest) returns (ProposeReply);
+  // A new manager joins with a manager join token (FDMT1-...). The only call taken without a manager certificate: the
+  // new manager has none yet. It checks this manager against the CA its token pins before it sends the token, and
+  // gets the cluster CA (certificate and key) back, so it can sign its own certificates as every manager does.
+  rpc Join(JoinRequest) returns (JoinReply);
+  // A joined manager (its manager certificate shown) asks to become a voter. Forwarded to the leader, which adds it as
+  // a learner, waits for it to catch up, then makes it a voter.
+  rpc AddVoter(AddVoterRequest) returns (AddVoterReply);
+  // The workers connected to this manager and how long since each was heard from. Liveness is not in the log; each
+  // manager asks the others about once a second, so a node is unreachable only when no manager hears it.
+  rpc Heard(HeardRequest) returns (HeardReply);
+}
+
+message HeardRequest {}
+
+message HeardReply {
+  repeated HeardNode nodes = 1;
+}
+
+message HeardNode {
+  string node_id = 1;
+  uint64 heard_ms_ago = 2;
+  uint64 connected_for_ms = 3;
+  // The worker's address as this manager sees it.
+  string peer = 4;
+  // The latest the worker reported, if it has.
+  NodeResources resources = 5;
+}
+
+message JoinRequest {
+  string join_token = 1;
+  uint64 raft_id = 2;
+  // Where the other managers reach it (host:port).
+  string addr = 3;
+}
+
+message JoinReply {
+  string ca_pem = 1;
+  string ca_key_pem = 2;
+  string cluster_id = 3;
+  repeated string managers = 4;
+}
+
+message AddVoterRequest {
+  uint64 raft_id = 1;
+  string addr = 2;
+}
+
+message AddVoterReply {}
+
+enum RaftRpc {
+  RAFT_RPC_UNSPECIFIED = 0;
+  RAFT_RPC_APPEND_ENTRIES = 1;
+  RAFT_RPC_VOTE = 2;
+  RAFT_RPC_FULL_SNAPSHOT = 3;
+  RAFT_RPC_PRE_VOTE = 4;
+}
+
+message RaftRequest {
+  uint64 target = 1;
+  RaftRpc rpc = 2;
+  bytes payload = 3;
+}
+
+message RaftReply {
+  // The answer as JSON, or empty with `error` set when the receiving Raft failed.
+  bytes payload = 1;
+  string error = 2;
+}
+
+message ProposeRequest {
+  bytes entry = 1;
+}
+
+message ProposeReply {
+  uint64 index = 1;
+  // Set when the entry was refused when applied (a spent token): the refusal as JSON.
+  bytes rejected = 2;
+  // Set when it could not be committed at all (no quorum, not the leader any more).
+  string unavailable = 3;
+}

@@ -1,0 +1,200 @@
+// The contract between a worker-agent and the manager-agents.
+//
+// A worker dials a manager (any manager: it never needs to know which one leads), enrols once with a join token for a
+// client certificate from the cluster CA, and from then on keeps one long-lived Open stream open. Everything after
+// enrolment goes over that stream: the worker's hello, its heartbeats, and its reports on commands; the manager's
+// welcome, its commands and its acknowledgements.
+//
+// Versioning: this is v1. Fields are only ever added (new numbers), never renumbered or reused; a breaking change is a
+// new package, freightdock.cluster.v2, served beside v1 for as long as old workers run.
+
+syntax = "proto3";
+
+package freightdock.cluster.v1;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Enrolment. Served over TLS with no client certificate; the worker checks the manager's chain against the CA whose
+// fingerprint its join token pins, so the token's secret goes to no other server.
+
+service Enrollment {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+}
+
+message EnrollRequest {
+  // The whole join token, FDCT1-<ca sha256>-<secret>.
+  string join_token = 1;
+  // A PKCS#10 certificate request, PEM. Only its public key is used; the manager sets the name, usage and dates.
+  string csr_pem = 2;
+  // The worker's own UUID, made on its first start and kept.
+  string node_id = 3;
+  string hostname = 4;
+}
+
+message EnrollResponse {
+  // The worker's client certificate, PEM, naming node_id.
+  string cert_pem = 1;
+  // The cluster CA, PEM. Its SHA-256 must be the one the token pins.
+  string ca_pem = 2;
+  string cluster_id = 3;
+  // Every manager endpoint known at enrolment (host:port), so the worker can fail over from its first day.
+  repeated string managers = 4;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The session. Mutual TLS: the client certificate names the node, and the manager believes nothing else about who it is.
+
+service WorkerSession {
+  // One per worker per manager, kept open. The worker's first message is a Hello; the manager's first is a Welcome.
+  rpc Open(stream WorkerMessage) returns (stream ManagerMessage);
+}
+
+message WorkerMessage {
+  oneof body {
+    Hello hello = 1;
+    Heartbeat heartbeat = 2;
+    CommandUpdate command_update = 3;
+  }
+}
+
+message ManagerMessage {
+  oneof body {
+    Welcome welcome = 1;
+    Command command = 2;
+    HeartbeatAck heartbeat_ack = 3;
+  }
+}
+
+message Hello {
+  // Must match the certificate's node id, or the stream is refused.
+  string node_id = 1;
+  string hostname = 2;
+  string agent_version = 3;
+  // The kernel's boot id (/proc/sys/kernel/random/boot_id): a new one means the worker rebooted since it last spoke.
+  string boot_id = 4;
+  FencingState fencing_state = 5;
+  map<string, string> labels = 6;
+  NodeResources resources = 7;
+  Capabilities capabilities = 8;
+  // Command ids the worker has seen and not finished, so a manager that took over can tell what is in flight.
+  repeated string in_flight = 9;
+}
+
+message Welcome {
+  string cluster_id = 1;
+  string manager_id = 2;
+  // How often the worker should send a heartbeat.
+  uint32 heartbeat_interval_ms = 3;
+  // Every manager endpoint the cluster knows now; the worker keeps this list for its next dial.
+  repeated string managers = 4;
+}
+
+message Heartbeat {
+  // Counts up from 1 on each stream.
+  uint64 seq = 1;
+  // The worker's wall clock, unix milliseconds; for diagnostics only, never for liveness.
+  int64 sent_at_ms = 2;
+  NodeResources resources = 3;
+}
+
+message HeartbeatAck {
+  uint64 seq = 1;
+}
+
+message NodeResources {
+  uint32 cpu_count = 1;
+  // 0..100 over all CPUs.
+  float cpu_percent = 2;
+  uint64 memory_total_bytes = 3;
+  uint64 memory_used_bytes = 4;
+  uint64 disk_total_bytes = 5;
+  uint64 disk_used_bytes = 6;
+  uint32 containers_running = 7;
+}
+
+message Capabilities {
+  bool docker = 1;
+  string docker_version = 2;
+  string os = 3;
+  string arch = 4;
+  string kernel = 5;
+}
+
+enum FencingState {
+  FENCING_STATE_UNSPECIFIED = 0;
+  // Running normally.
+  FENCING_STATE_NONE = 1;
+  // Fenced itself (stopped managed workloads, maybe rebooted) and waits for the managers to authorize it again.
+  FENCING_STATE_AWAITING_AUTHORIZATION = 2;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Commands. A command is idempotent by its id: a worker that sees an id again (a resend after a reconnect, another
+// manager's copy) reports the state it already has and does not run it twice.
+
+message Command {
+  string command_id = 1;
+  // The node it is for; a worker refuses a command addressed to another node.
+  string node_id = 2;
+  // The cluster configuration version it was made against.
+  uint64 config_version = 3;
+  // Unix milliseconds after which the worker must not start it (it reports EXPIRED instead).
+  int64 deadline_ms = 4;
+  oneof op {
+    Ping ping = 10;
+    DockerInfo docker_info = 11;
+    RunContainer run_container = 12;
+    StopContainer stop_container = 13;
+    RemoveContainer remove_container = 14;
+  }
+}
+
+// Does nothing; proves the round trip.
+message Ping {}
+
+// Answers the worker's Docker version and container counts.
+message DockerInfo {}
+
+// Starts one container for a workload. The container is labelled with the workload id so the worker can find it again;
+// its restart policy is always "no", as a managed workload is restarted by the cluster, never by Docker on its own.
+message RunContainer {
+  string workload_id = 1;
+  string image = 2;
+  string name = 3;
+  repeated string command = 4;
+  map<string, string> env = 5;
+  map<string, string> labels = 6;
+}
+
+message StopContainer {
+  string workload_id = 1;
+  uint32 timeout_s = 2;
+}
+
+message RemoveContainer {
+  string workload_id = 1;
+}
+
+enum CommandStatus {
+  COMMAND_STATUS_UNSPECIFIED = 0;
+  // The manager has recorded it; not yet delivered.
+  COMMAND_STATUS_PENDING = 1;
+  // The worker has it. Says nothing about whether it will run.
+  COMMAND_STATUS_RECEIVED = 2;
+  // The worker checked it and is running it.
+  COMMAND_STATUS_ACCEPTED = 3;
+  COMMAND_STATUS_SUCCEEDED = 4;
+  COMMAND_STATUS_FAILED = 5;
+  // The worker would not run it (another node's, unknown op, fenced).
+  COMMAND_STATUS_REJECTED = 6;
+  // Its deadline passed before it started.
+  COMMAND_STATUS_EXPIRED = 7;
+}
+
+message CommandUpdate {
+  string command_id = 1;
+  CommandStatus status = 2;
+  // A person-readable line: why it failed, what it did.
+  string message = 3;
+  // The op's answer as JSON, for those that have one (DockerInfo, RunContainer's container id).
+  string result_json = 4;
+}

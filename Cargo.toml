@@ -1,0 +1,23 @@
+# freightdock-proto: the contract every cluster component speaks. The manager-agent, the worker-agent, the network-agent
+# and the UI's server take this crate as a dependency (a path while everything is local, a git tag once published) and
+# never each other's internals.
+[package]
+name = "freightdock-proto"
+description = "The cluster's API contracts: protobuf messages and gRPC services, the join token, shared names."
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+repository = "https://github.com/freightdock/Contracts"
+rust-version = "1.90"
+
+[dependencies]
+hex = "0.4"
+prost = "0.14"
+sha2 = "0.10"
+tonic = { version = "0.14", default-features = false, features = ["codegen", "transport"] }
+tonic-prost = "0.14"
+
+[build-dependencies]
+# protox compiles the .proto files in Rust, so building needs no protoc on the machine.
+protox = "0.10"
+tonic-prost-build = "0.14"

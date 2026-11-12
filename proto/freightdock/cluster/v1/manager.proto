@@ -48,6 +48,8 @@ message HeardNode {
   WorkloadReport workloads = 6;
   // Its overlay as it last reported it (G9): its key, the network version applied, why not, if not.
   NetworkReport network = 7;
+  // Its latest traffic report (G9.8).
+  TrafficReport traffic = 8;
 }
 
 message JoinRequest {

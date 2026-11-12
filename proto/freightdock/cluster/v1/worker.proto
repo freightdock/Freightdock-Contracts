@@ -133,6 +133,35 @@ message Heartbeat {
   WorkloadReport workloads = 4;
   FencingState fencing_state = 5;
   NetworkReport network = 6;
+  // The connections that went through the node since the last heartbeat (G9.8). Absent without connection tracking.
+  TrafficReport traffic = 7;
+}
+
+// The node's share of the cluster's traffic over `over_ms`: each connection counted by one node only, the one it
+// started on (a workload of the node to anywhere) or came in on (from outside the cluster through a published port or
+// floating address). The second leg of a connection forwarded through the mesh is its first leg's node's to count.
+message TrafficReport {
+  repeated Flow flows = 1;
+  uint64 over_ms = 2;
+}
+
+// The connections between two ends to one port, added up.
+message Flow {
+  // A workload's overlay address, or empty: from outside the cluster (a client's address is not kept).
+  string src = 1;
+  // Where it went, as reached: an overlay address, or empty: outside the cluster.
+  string dst = 2;
+  // The destination's port, as reached.
+  uint32 port = 3;
+  // The published port it came in on through the mesh, 0 if it did not.
+  uint32 published_port = 4;
+  // tcp or udp.
+  string protocol = 5;
+  // Bytes from src to dst, and back, over the report's time.
+  uint64 bytes_out = 6;
+  uint64 bytes_in = 7;
+  // The connections seen in that time.
+  uint32 connections = 8;
 }
 
 // What runs on a worker for the cluster: every container labelled as managed, whatever its state. The manager compares

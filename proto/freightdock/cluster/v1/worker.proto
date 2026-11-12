@@ -181,6 +181,10 @@ message NetworkState {
   // The cluster's published ports (G10, the routing mesh): every node answers each on its own addresses and
   // forwards it to the workloads behind it, wherever they run.
   repeated Exposure exposures = 7;
+  // The floating addresses this node holds (G10.3), as 192.0.2.10: each on one node at a time, answered on its LAN
+  // and moved by the managers only once its holder is fenced. The published ports answer on them as on the node's
+  // own addresses.
+  repeated string floating = 8;
 }
 
 message Exposure {

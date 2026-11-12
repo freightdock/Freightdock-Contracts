@@ -46,6 +46,8 @@ message HeardNode {
   NodeResources resources = 5;
   // The managed containers it last reported.
   WorkloadReport workloads = 6;
+  // Its overlay as it last reported it (G9): its key, the network version applied, why not, if not.
+  NetworkReport network = 7;
 }
 
 message JoinRequest {

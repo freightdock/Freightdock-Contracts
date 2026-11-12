@@ -44,6 +44,8 @@ message HeardNode {
   string peer = 4;
   // The latest the worker reported, if it has.
   NodeResources resources = 5;
+  // The managed containers it last reported.
+  WorkloadReport workloads = 6;
 }
 
 message JoinRequest {

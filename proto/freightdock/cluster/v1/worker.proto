@@ -61,6 +61,7 @@ message ManagerMessage {
     Welcome welcome = 1;
     Command command = 2;
     HeartbeatAck heartbeat_ack = 3;
+    Authorize authorize = 4;
   }
 }
 
@@ -77,6 +78,8 @@ message Hello {
   Capabilities capabilities = 8;
   // Command ids the worker has seen and not finished, so a manager that took over can tell what is in flight.
   repeated string in_flight = 9;
+  // The managed containers on the node now. Absent when the worker could not ask its Docker.
+  WorkloadReport workloads = 10;
 }
 
 message Welcome {
@@ -86,6 +89,19 @@ message Welcome {
   uint32 heartbeat_interval_ms = 3;
   // Every manager endpoint the cluster knows now; the worker keeps this list for its next dial.
   repeated string managers = 4;
+  // The cluster's self-fencing timers (G6), in seconds: after `fence_stop_s` without any manager the worker stops its
+  // managed workloads and fences; `fence_storage_s` later it stops shared-storage writes; `fence_reboot_s` after that
+  // it reboots if it could not stop them. 0: the worker keeps what it has.
+  uint32 fence_stop_s = 5;
+  uint32 fence_storage_s = 6;
+  uint32 fence_reboot_s = 7;
+}
+
+// The managers let a fenced worker run managed workloads again (plan 7.4). Until it has this, a fenced worker runs
+// none, whatever it is told.
+message Authorize {
+  // Who decided, for the worker's log.
+  string by = 1;
 }
 
 message Heartbeat {
@@ -94,6 +110,27 @@ message Heartbeat {
   // The worker's wall clock, unix milliseconds; for diagnostics only, never for liveness.
   int64 sent_at_ms = 2;
   NodeResources resources = 3;
+  // The managed containers on the node, read as the heartbeat was made. Absent when the worker could not ask its Docker.
+  WorkloadReport workloads = 4;
+  FencingState fencing_state = 5;
+}
+
+// What runs on a worker for the cluster: every container labelled as managed, whatever its state. The manager compares
+// it with what should run there (G4 reconcile) and sends commands for the difference.
+message WorkloadReport {
+  repeated WorkloadState workloads = 1;
+}
+
+message WorkloadState {
+  string workload_id = 1;
+  string container_id = 2;
+  // Docker's word for it: created, running, paused, restarting, removing, exited, dead.
+  string state = 3;
+  // The workload generation the container was made for (RunContainer.generation); 0 for one made without.
+  uint64 generation = 4;
+  // The exit code, once it has exited.
+  int32 exit_code = 5;
+  string image = 6;
 }
 
 message HeartbeatAck {
@@ -156,6 +193,8 @@ message DockerInfo {}
 
 // Starts one container for a workload. The container is labelled with the workload id so the worker can find it again;
 // its restart policy is always "no", as a managed workload is restarted by the cluster, never by Docker on its own.
+// A container for the workload that is already there is started if stopped, and made again if it was made for another
+// generation (the workload's spec changed).
 message RunContainer {
   string workload_id = 1;
   string image = 2;
@@ -163,6 +202,23 @@ message RunContainer {
   repeated string command = 4;
   map<string, string> env = 5;
   map<string, string> labels = 6;
+  // Counts up each time the workload's spec changes; kept on the container as a label.
+  uint64 generation = 7;
+  repeated PortMapping ports = 8;
+  // Docker's form: source:target or source:target:ro, the source a named volume or an absolute host path.
+  repeated string volumes = 9;
+  // What the container may use at most: thousandths of a CPU and bytes of memory; 0 is no limit.
+  uint64 cpu_millis = 10;
+  uint64 memory_bytes = 11;
+}
+
+message PortMapping {
+  uint32 host_port = 1;
+  uint32 container_port = 2;
+  // tcp or udp; tcp when empty.
+  string protocol = 3;
+  // The host address to bind; all when empty.
+  string host_ip = 4;
 }
 
 message StopContainer {

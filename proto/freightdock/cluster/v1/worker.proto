@@ -216,6 +216,7 @@ message NetworkState {
   repeated string floating = 8;
 }
 
+// One port the cluster answers from outside, and the workloads behind it.
 message Exposure {
   string stack = 1;
   // tcp or udp.
@@ -224,6 +225,10 @@ message Exposure {
   uint32 port = 3;
   // Where to: each running workload's overlay address and its container's port, as 10.240.1.3:80.
   repeated string targets = 4;
+  // Empty: a Compose file's published port, answered on every node's own addresses (never on a floating one). Else
+  // a floating address of the pool (G10.5): answered on that address only, the port its own there, so two stacks
+  // may use one port on two addresses.
+  string address = 5;
 }
 
 message NetworkPeer {

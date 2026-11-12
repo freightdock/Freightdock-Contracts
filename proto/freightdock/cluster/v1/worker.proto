@@ -175,6 +175,22 @@ message NetworkState {
   repeated NetworkPeer peers = 4;
   // The stack networks this node needs: those with a workload placed on it.
   repeated StackNetwork stacks = 5;
+  // This node's own overlay address (G10), as 10.240.0.7: what traffic it forwards to another node comes from. Its
+  // peers' are among their addresses.
+  string node_address = 6;
+  // The cluster's published ports (G10, the routing mesh): every node answers each on its own addresses and
+  // forwards it to the workloads behind it, wherever they run.
+  repeated Exposure exposures = 7;
+}
+
+message Exposure {
+  string stack = 1;
+  // tcp or udp.
+  string protocol = 2;
+  // The port every node answers on.
+  uint32 port = 3;
+  // Where to: each running workload's overlay address and its container's port, as 10.240.1.3:80.
+  repeated string targets = 4;
 }
 
 message NetworkPeer {

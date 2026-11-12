@@ -11,6 +11,10 @@ pub mod v1 {
 
 /// The name every manager's server certificate carries, and the name a worker checks, whatever address it dialled.
 /// A fixed name means a manager can be reached by IP, by any DNS name or through NAT without a certificate per address.
+/// Ports a node keeps for itself, never published through the routing mesh (G10): ssh, the managers' (7450 the
+/// cluster, 7451 and 7452 their API) and WireGuard's.
+pub const RESERVED_PORTS: [u32; 5] = [22, 7450, 7451, 7452, 51820];
+
 pub const MANAGER_SERVER_NAME: &str = "manager.freightdock.internal";
 
 /// The common-name prefix of a manager's client certificate (`manager:<raft id>`). The cluster CA sets every common

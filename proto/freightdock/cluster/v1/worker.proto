@@ -62,6 +62,7 @@ message ManagerMessage {
     Command command = 2;
     HeartbeatAck heartbeat_ack = 3;
     Authorize authorize = 4;
+    NetworkState network = 5;
   }
 }
 
@@ -80,6 +81,8 @@ message Hello {
   repeated string in_flight = 9;
   // The managed containers on the node now. Absent when the worker could not ask its Docker.
   WorkloadReport workloads = 10;
+  // The node's overlay (G9). Absent from a worker without one.
+  NetworkReport network = 11;
 }
 
 message Welcome {
@@ -113,6 +116,7 @@ message Heartbeat {
   // The managed containers on the node, read as the heartbeat was made. Absent when the worker could not ask its Docker.
   WorkloadReport workloads = 4;
   FencingState fencing_state = 5;
+  NetworkReport network = 6;
 }
 
 // What runs on a worker for the cluster: every container labelled as managed, whatever its state. The manager compares
@@ -131,6 +135,49 @@ message WorkloadState {
   // The exit code, once it has exited.
   int32 exit_code = 5;
   string image = 6;
+}
+
+// The node's side of the overlay (G9): its WireGuard key, made on the node (the private key never leaves it), and how
+// far it got with the managers' network state.
+message NetworkReport {
+  string public_key = 1;
+  uint32 listen_port = 2;
+  // The NetworkState.version applied, all of it; 0 for none yet.
+  uint64 applied_version = 3;
+  // Why the last state could not be applied, if it could not.
+  string error = 4;
+}
+
+// The network a node should have (G9), whole each time: the worker makes it so and removes what is not in it. Sent
+// when it changes and at every new stream; an older version than the one applied is ignored.
+message NetworkState {
+  uint64 version = 1;
+  // The cluster's internal range, as 10.240.0.0/16: the routes and the filters stay inside it.
+  string cluster_range = 2;
+  uint32 mtu = 3;
+  // Every other node with an overlay.
+  repeated NetworkPeer peers = 4;
+  // The stack networks this node needs: those with a workload placed on it.
+  repeated StackNetwork stacks = 5;
+}
+
+message NetworkPeer {
+  string node_id = 1;
+  string public_key = 2;
+  // host:port of its WireGuard, as the managers see the node.
+  string endpoint = 3;
+  // The workload addresses on that node (/32): routed to it.
+  repeated string addresses = 4;
+}
+
+// A stack's network: a bridge on every node that runs a part of it, all with the same subnet; its workloads talk to
+// each other and to nothing else in the cluster range.
+message StackNetwork {
+  string stack = 1;
+  // As 10.240.3.0/24.
+  string subnet = 2;
+  // The bridge's own address, as 10.240.3.1.
+  string gateway = 3;
 }
 
 message HeartbeatAck {
@@ -210,6 +257,11 @@ message RunContainer {
   // What the container may use at most: thousandths of a CPU and bytes of memory; 0 is no limit.
   uint64 cpu_millis = 10;
   uint64 memory_bytes = 11;
+  // On the overlay (G9): the stack whose network the container joins, its fixed address there, and the names of the
+  // stack's services, each "name:address". Empty stack: Docker's default network, as before.
+  string network_stack = 12;
+  string address = 13;
+  repeated string hosts = 14;
 }
 
 message PortMapping {

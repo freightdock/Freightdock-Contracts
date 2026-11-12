@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn messages_round_trip() {
         use prost::Message;
-        let m = v1::WorkerMessage { body: Some(v1::worker_message::Body::Heartbeat(v1::Heartbeat { seq: 7, sent_at_ms: 1, resources: None })) };
+        let m = v1::WorkerMessage { body: Some(v1::worker_message::Body::Heartbeat(v1::Heartbeat { seq: 7, sent_at_ms: 1, resources: None, ..Default::default() })) };
         let back = v1::WorkerMessage::decode(m.encode_to_vec().as_slice()).unwrap();
         assert_eq!(back, m);
     }

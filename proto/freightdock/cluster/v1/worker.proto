@@ -46,6 +46,10 @@ message EnrollResponse {
 service WorkerSession {
   // One per worker per manager, kept open. The worker's first message is a Hello; the manager's first is a Welcome.
   rpc Open(stream WorkerMessage) returns (stream ManagerMessage);
+  // A new certificate for a new key (G2.7), asked with the node's current certificate when the welcome says
+  // renew_certificate. The current one stays good until the next renewal, so a worker that fails to keep the new
+  // one is not locked out.
+  rpc Renew(RenewRequest) returns (RenewResponse);
 }
 
 message WorkerMessage {
@@ -98,6 +102,18 @@ message Welcome {
   uint32 fence_stop_s = 5;
   uint32 fence_storage_s = 6;
   uint32 fence_reboot_s = 7;
+  // The certificate this stream came with expires soon (within a year): ask for another with Renew.
+  bool renew_certificate = 8;
+}
+
+message RenewRequest {
+  // A PKCS#10 request for the worker's new key; the managers name the certificate for the node itself.
+  string csr_pem = 1;
+}
+
+message RenewResponse {
+  string cert_pem = 1;
+  string ca_pem = 2;
 }
 
 // The managers let a fenced worker run managed workloads again (plan 7.4). Until it has this, a fenced worker runs

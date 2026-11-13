@@ -332,6 +332,23 @@ message RunContainer {
   string network_stack = 12;
   string address = 13;
   repeated string hosts = 14;
+  // Named volumes kept on the cluster's shared storage (G11): the worker makes the storage ready (mounts it, or finds
+  // the directory), makes the volume's directory there and binds it in place of a Docker volume of that name.
+  repeated StorageVolume storage = 15;
+}
+
+// A named volume on shared storage, as a worker needs it.
+message StorageVolume {
+  // The volume's name in `volumes` ("data" of "data:/var/lib/data").
+  string volume = 1;
+  // The storage it is on: its name, driver ("nfs" or "path"), source (nfs: "host:/export"; path: an absolute
+  // directory that is the same shared storage on every node) and mount options (nfs only).
+  string storage = 2;
+  string driver = 3;
+  string source = 4;
+  string options = 5;
+  // The volume's directory inside the storage, "<stack>/<volume>".
+  string dir = 6;
 }
 
 message PortMapping {

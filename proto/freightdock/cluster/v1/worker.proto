@@ -88,6 +88,8 @@ message DockerRequest {
   // The container, image, volume or network it is about (an id or a name), where it is about one.
   string target = 3;
   map<string, string> params = 4;
+  // For "image.pull": the registry's login, as on RunContainer.
+  RegistryAuth auth = 5;
 }
 
 message DockerReply {
@@ -368,6 +370,17 @@ message RunContainer {
   // Named volumes kept on the cluster's shared storage (G11): the worker makes the storage ready (mounts it, or finds
   // the directory), makes the volume's directory there and binds it in place of a Docker volume of that name.
   repeated StorageVolume storage = 15;
+  // The private registry's login for the image, when the cluster has one for its registry. Filled in by the manager
+  // that sends the command, never kept with it.
+  RegistryAuth auth = 16;
+}
+
+// A login to a container registry, for a pull. `server` is the registry's host as Docker names it ("ghcr.io",
+// "registry.example:5000"); Docker Hub's is "docker.io".
+message RegistryAuth {
+  string server = 1;
+  string username = 2;
+  string password = 3;
 }
 
 // A named volume on shared storage, as a worker needs it.

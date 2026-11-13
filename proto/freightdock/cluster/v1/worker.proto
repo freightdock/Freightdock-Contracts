@@ -180,6 +180,9 @@ message WorkloadState {
   // The exit code, once it has exited.
   int32 exit_code = 5;
   string image = 6;
+  // Its IPv4 addresses on its networks while it runs, so the managers see one not on its overlay address (made before
+  // its node knew the overlay) and make it again. None from a worker that does not report them: then nothing is made.
+  repeated string addresses = 7;
 }
 
 // The node's side of the overlay (G9): its WireGuard key, made on the node (the private key never leaves it), and how

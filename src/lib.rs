@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn a_missing_port_is_the_default() {
-        assert_eq!(with_default_port("10.0.0.5"), "10.0.0.5:7450");
+        assert_eq!(with_default_port("192.0.2.5"), "192.0.2.5:7450");
         assert_eq!(with_default_port(" mgr1.lan "), "mgr1.lan:7450");
         assert_eq!(with_default_port("mgr1.lan:9000"), "mgr1.lan:9000");
         assert_eq!(with_default_port("[fd00::1]:9000"), "[fd00::1]:9000");

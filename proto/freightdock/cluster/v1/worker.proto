@@ -57,6 +57,7 @@ message WorkerMessage {
     Hello hello = 1;
     Heartbeat heartbeat = 2;
     CommandUpdate command_update = 3;
+    DockerReply docker_reply = 4;
   }
 }
 
@@ -67,7 +68,34 @@ message ManagerMessage {
     HeartbeatAck heartbeat_ack = 3;
     Authorize authorize = 4;
     NetworkState network = 5;
+    DockerRequest docker = 6;
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The node's Docker, for a person (the UI's per-node pages). Not a command: nothing is written to the cluster's log, as
+// a read (a container list, logs) is large and only for now. The manager holding the node's stream sends it and waits
+// for the reply with the same id; another manager forwards through ManagerPeer.Docker. A worker never changes one of
+// the cluster's own containers this way (one labelled with a workload): those belong to their stack.
+
+message DockerRequest {
+  string request_id = 1;
+  // Reads: "info", "containers", "container" (inspect `target`), "logs" (`target`; params tail, timestamps),
+  // "images", "volumes", "networks". Changes: "container.start", "container.stop", "container.restart",
+  // "container.remove" (params force), "image.remove" (params force), "image.pull" (params image),
+  // "images.prune", "volume.remove", "network.remove". Another action is refused.
+  string action = 2;
+  // The container, image, volume or network it is about (an id or a name), where it is about one.
+  string target = 3;
+  map<string, string> params = 4;
+}
+
+message DockerReply {
+  string request_id = 1;
+  // Why it was refused or failed, for a person; empty when it worked.
+  string error = 2;
+  // The answer as JSON (the list, the inspect, the logs' lines), where there is one.
+  string json = 3;
 }
 
 message Hello {
@@ -274,6 +302,8 @@ message Capabilities {
   string os = 3;
   string arch = 4;
   string kernel = 5;
+  // Answers DockerRequest (the per-node Docker pages); an older worker does not.
+  bool docker_requests = 6;
 }
 
 enum FencingState {

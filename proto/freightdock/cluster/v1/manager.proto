@@ -28,6 +28,13 @@ service ManagerPeer {
   // The workers connected to this manager and how long since each was heard from. Liveness is not in the log; each
   // manager asks the others about once a second, so a node is unreachable only when no manager hears it.
   rpc Heard(HeardRequest) returns (HeardReply);
+  // A DockerRequest for a node whose stream this manager holds: sent to its worker, the reply handed back.
+  rpc Docker(PeerDockerRequest) returns (DockerReply);
+}
+
+message PeerDockerRequest {
+  string node_id = 1;
+  DockerRequest request = 2;
 }
 
 message HeardRequest {}

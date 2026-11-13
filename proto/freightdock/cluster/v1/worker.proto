@@ -165,6 +165,28 @@ message Heartbeat {
   NetworkReport network = 6;
   // The connections that went through the node since the last heartbeat (G9.8). Absent without connection tracking.
   TrafficReport traffic = 7;
+  // How the shared storage it has made ready answers (G11.8). Absent from a worker that does not probe it.
+  StorageReport storage = 8;
+}
+
+// The node's view of each shared storage it has made ready for a workload, probed in the background: an NFS export
+// still mounted where it should be, its free space, and a small file written, read back and removed.
+message StorageReport {
+  repeated StorageHealth storages = 1;
+}
+
+message StorageHealth {
+  string name = 1;
+  string driver = 2;
+  bool ok = 3;
+  // Why not, in words: not mounted, the write failed, the probe has not answered for a while.
+  string error = 4;
+  uint64 total_bytes = 5;
+  uint64 free_bytes = 6;
+  // How long the last probe took.
+  uint32 probe_ms = 7;
+  // When it was last probed, the worker's clock, unix milliseconds.
+  int64 at_ms = 8;
 }
 
 // The node's share of the cluster's traffic over `over_ms`: each connection counted by one node only, the one it

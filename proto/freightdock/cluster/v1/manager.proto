@@ -57,6 +57,8 @@ message HeardNode {
   NetworkReport network = 7;
   // Its latest traffic report (G9.8).
   TrafficReport traffic = 8;
+  // Its shared storage's health as it last reported it (G11.8).
+  StorageReport storage = 9;
 }
 
 message JoinRequest {

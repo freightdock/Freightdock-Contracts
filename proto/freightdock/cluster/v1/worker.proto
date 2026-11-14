@@ -357,6 +357,7 @@ message Command {
     StopContainer stop_container = 13;
     RemoveContainer remove_container = 14;
     CephCommand ceph_command = 15;
+    Cephadm cephadm = 16;
   }
 }
 
@@ -440,6 +441,28 @@ message CephCommand {
   repeated string args = 5;
   // How long it may run, seconds; 0 is 60.
   uint32 timeout_s = 6;
+}
+
+// One step of setting Ceph up on this node with cephadm (G12.6, Ceph made from the UI), run on the host as root. The
+// worker knows each action and what it runs; nothing else is run. Each is safe to run again.
+//
+//   prepare     args [cephadm's download URL]: cephadm fetched into the worker's data directory, lvm2 installed if
+//               missing; answers {"address", "hostname"} (the address of the default route)
+//   bootstrap   args [monitor address, "single-host" or ""]: a new Ceph cluster with its first monitor here
+//               (no dashboard, no monitoring stack), or the one already here; answers {"fsid", "public_key"}
+//   trust       args [cephadm's public SSH key]: added to root's authorized_keys, so the Ceph managers reach the host
+//   shell       args [ceph arguments...]: `ceph <args>` in `cephadm shell` with the admin key on this node;
+//               answers {"stdout"}
+//   keys        args [filesystem, client, fencing client]: both clients made (or found), the mount client's key of
+//               the type the kernel takes; answers {"mount_key", "fence_key", "fsid"}. The managers take the keys
+//               out of the answer before it is kept anywhere.
+message Cephadm {
+  string action = 1;
+  repeated string args = 2;
+  // The Ceph image the cluster runs, as quay.io/ceph/ceph:v20.
+  string image = 3;
+  // How long it may run, seconds; 0 is 900.
+  uint32 timeout_s = 4;
 }
 
 message PortMapping {

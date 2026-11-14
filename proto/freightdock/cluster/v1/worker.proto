@@ -50,6 +50,11 @@ service WorkerSession {
   // renew_certificate. The current one stays good until the next renewal, so a worker that fails to keep the new
   // one is not locked out.
   rpc Renew(RenewRequest) returns (RenewResponse);
+  // A shell for a person (the UI's terminal), dialled by the worker when a ShellOpen comes down its session, to the
+  // same manager: the first ShellUp names the session, then the shell's output goes up and the keys typed come down.
+  // A stream of its own, so a shell's output never holds up the session's heartbeats. Either side ending the stream
+  // ends the shell.
+  rpc Shell(stream ShellUp) returns (stream ShellDown);
 }
 
 message WorkerMessage {
@@ -69,6 +74,7 @@ message ManagerMessage {
     Authorize authorize = 4;
     NetworkState network = 5;
     DockerRequest docker = 6;
+    ShellOpen shell_open = 7;
   }
 }
 
@@ -328,6 +334,11 @@ message Capabilities {
   string kernel = 5;
   // Answers DockerRequest (the per-node Docker pages); an older worker does not.
   bool docker_requests = 6;
+  // Answers ShellOpen for a container's shell; an older worker does not.
+  bool shells = 7;
+  // Answers ShellOpen for the host's own shell too: the node's owner can turn it off on the node, whatever the
+  // managers say.
+  bool host_shell = 8;
 }
 
 enum FencingState {
@@ -506,4 +517,52 @@ message CommandUpdate {
   string message = 3;
   // The op's answer as JSON, for those that have one (DockerInfo, RunContainer's container id).
   string result_json = 4;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Shells (the UI's terminal). Not a command and not in the cluster's log: a person's session, for now only. The
+// manager holding the node's stream sends ShellOpen; the worker dials WorkerSession.Shell to that manager and runs the
+// shell on a terminal of its own, a login shell as root on the host, or `docker exec` with a terminal in a container.
+// Another manager reaches it through ManagerPeer.Shell.
+
+message ShellOpen {
+  // The session's id, made by the manager; the worker's first ShellUp names it.
+  string session_id = 1;
+  // The container (an id or a name); empty for the host's own shell.
+  string container = 2;
+  // The terminal's size to start with.
+  uint32 cols = 3;
+  uint32 rows = 4;
+}
+
+message ShellSize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+message ShellEnd {
+  // The shell's exit code, when it exited.
+  int32 exit_code = 1;
+  // Why it could not start or was ended, for a person; empty when it exited by itself.
+  string error = 2;
+}
+
+message ShellUp {
+  oneof body {
+    // First, and only first: the session this stream is for.
+    string session_id = 1;
+    // What the shell wrote to its terminal.
+    bytes output = 2;
+    // The shell ended (or never started); the last message.
+    ShellEnd end = 3;
+  }
+}
+
+message ShellDown {
+  oneof body {
+    // What was typed.
+    bytes input = 1;
+    // The terminal was resized.
+    ShellSize resize = 2;
+  }
 }

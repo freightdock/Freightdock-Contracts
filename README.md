@@ -5,7 +5,7 @@ the network-agent and the UI's server speak, plus what they must agree on that i
 token's format, the name on a manager's certificate, the default port).
 
 ```
-proto/freightdock/cluster/v1/worker.proto   enrolment and the worker session: hello, heartbeats, commands, reports
+proto/freightdock/cluster/v1/worker.proto   enrolment and the worker session: hello, heartbeats, commands, reports, shells
 proto/freightdock/cluster/v1/manager.proto  manager to manager: Raft RPCs (opaque JSON) and forwarded proposals
 src/token.rs                                FDCT1-<CA sha256>-<secret>, the cluster join token
 src/lib.rs                                  the generated code (module v1) and the shared names

@@ -60,4 +60,15 @@ mod tests {
         let back = v1::WorkerMessage::decode(m.encode_to_vec().as_slice()).unwrap();
         assert_eq!(back, m);
     }
+
+    #[test]
+    fn a_shell_s_messages_round_trip_with_raw_bytes() {
+        use prost::Message;
+        let up = v1::ShellUp { body: Some(v1::shell_up::Body::Output(vec![0x1b, b'[', b'0', b'm', 0xff, 0])) };
+        assert_eq!(v1::ShellUp::decode(up.encode_to_vec().as_slice()).unwrap(), up, "any byte, not only UTF-8");
+        let open = v1::ManagerMessage { body: Some(v1::manager_message::Body::ShellOpen(v1::ShellOpen { session_id: "s1".into(), container: String::new(), cols: 120, rows: 40 })) };
+        assert_eq!(v1::ManagerMessage::decode(open.encode_to_vec().as_slice()).unwrap(), open);
+        let peer = v1::PeerShellDown { node_id: "n1".into(), open: None, down: Some(v1::ShellDown { body: Some(v1::shell_down::Body::Resize(v1::ShellSize { cols: 80, rows: 24 })) }) };
+        assert_eq!(v1::PeerShellDown::decode(peer.encode_to_vec().as_slice()).unwrap(), peer);
+    }
 }

@@ -30,6 +30,17 @@ service ManagerPeer {
   rpc Heard(HeardRequest) returns (HeardReply);
   // A DockerRequest for a node whose stream this manager holds: sent to its worker, the reply handed back.
   rpc Docker(PeerDockerRequest) returns (DockerReply);
+  // A shell on a node whose stream this manager holds: the first message names the node and opens it, the rest are
+  // what is typed; the shell's output (from its first ShellUp after the session id) comes back.
+  rpc Shell(stream PeerShellDown) returns (stream ShellUp);
+}
+
+message PeerShellDown {
+  // In the first message only: the node and the shell to open on it.
+  string node_id = 1;
+  ShellOpen open = 2;
+  // In each later message.
+  ShellDown down = 3;
 }
 
 message PeerDockerRequest {

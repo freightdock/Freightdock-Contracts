@@ -356,6 +356,7 @@ message Command {
     RunContainer run_container = 12;
     StopContainer stop_container = 13;
     RemoveContainer remove_container = 14;
+    CephCommand ceph_command = 15;
   }
 }
 
@@ -409,14 +410,36 @@ message RegistryAuth {
 message StorageVolume {
   // The volume's name in `volumes` ("data" of "data:/var/lib/data").
   string volume = 1;
-  // The storage it is on: its name, driver ("nfs" or "path"), source (nfs: "host:/export"; path: an absolute
-  // directory that is the same shared storage on every node) and mount options (nfs only).
+  // The storage it is on: its name, driver ("nfs", "cephfs" or "path"), source (nfs: "host:/export"; cephfs: the
+  // monitors' addresses and a path, "192.0.2.1,192.0.2.2:6789:/"; path: an absolute directory that is the same
+  // shared storage on every node) and mount options (nfs and cephfs; cephfs: name= the client, fs= the filesystem).
   string storage = 2;
   string driver = 3;
   string source = 4;
   string options = 5;
   // The volume's directory inside the storage, "<stack>/<volume>".
   string dir = 6;
+  // cephfs: the client's key, handed to the kernel with the mount and never written to the node's disk. Filled in by
+  // the manager that sends the command, never kept with it.
+  string secret = 7;
+}
+
+// Runs the `ceph` command line once, in a throwaway container of the Ceph image on this node (host network), against
+// a Ceph cluster outside Freightdock's own state: what the managers ask of Ceph (G12.6), such as evicting a fenced
+// node's CephFS client so it can write no more. The answer is what it printed (result_json {"stdout": ...}). The key is
+// filled in by the manager that sends it, never kept with the command, and is in the container only while it runs.
+message CephCommand {
+  // The Ceph image to run it in, as quay.io/ceph/ceph:v20 (pulled when not on the node).
+  string image = 1;
+  // The monitors, "192.0.2.1,192.0.2.2:6789".
+  string mons = 2;
+  // The client it runs as (without "client."), and its key.
+  string client = 3;
+  string secret = 4;
+  // The arguments after `ceph`, each one as is (no shell): ["tell", "mds.fs1:0", "client", "evict", ...].
+  repeated string args = 5;
+  // How long it may run, seconds; 0 is 60.
+  uint32 timeout_s = 6;
 }
 
 message PortMapping {

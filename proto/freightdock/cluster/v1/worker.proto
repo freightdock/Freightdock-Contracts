@@ -446,17 +446,18 @@ message RegistryAuth {
 message StorageVolume {
   // The volume's name in `volumes` ("data" of "data:/var/lib/data").
   string volume = 1;
-  // The storage it is on: its name, driver ("nfs", "cephfs" or "path"), source (nfs: "host:/export"; cephfs: the
-  // monitors' addresses and a path, "192.0.2.1,192.0.2.2:6789:/"; path: an absolute directory that is the same
-  // shared storage on every node) and mount options (nfs and cephfs; cephfs: name= the client, fs= the filesystem).
+  // The storage it is on: its name, driver ("nfs", "smb", "cephfs" or "path"), source (nfs: "host:/export"; smb:
+  // "//host/share" and maybe a path in it; cephfs: the monitors' addresses and a path, "192.0.2.1,192.0.2.2:6789:/";
+  // path: an absolute directory that is the same shared storage on every node) and mount options (nfs, smb and
+  // cephfs; smb: username= or guest, never the password; cephfs: name= the client, fs= the filesystem).
   string storage = 2;
   string driver = 3;
   string source = 4;
   string options = 5;
   // The volume's directory inside the storage, "<stack>/<volume>".
   string dir = 6;
-  // cephfs: the client's key, handed to the kernel with the mount and never written to the node's disk. Filled in by
-  // the manager that sends the command, never kept with it.
+  // cephfs: the client's key; smb: the password. Handed to the kernel with the mount and never written to the node's
+  // disk or a command line. Filled in by the manager that sends the command, never kept with it.
   string secret = 7;
 }
 

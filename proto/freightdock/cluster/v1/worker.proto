@@ -55,6 +55,18 @@ service WorkerSession {
   // A stream of its own, so a shell's output never holds up the session's heartbeats. Either side ending the stream
   // ends the shell.
   rpc Shell(stream ShellUp) returns (stream ShellDown);
+  // A binary of the cluster's release, by its SHA-256, from the manager the worker is connected to: what an Upgrade
+  // names. Refused for a checksum that is no release's.
+  rpc Fetch(FetchRequest) returns (stream FetchChunk);
+}
+
+message FetchRequest {
+  string sha256 = 1;
+}
+
+// A piece of the binary, in order; the stream's end is its end.
+message FetchChunk {
+  bytes data = 1;
 }
 
 message WorkerMessage {
@@ -339,6 +351,8 @@ message Capabilities {
   // Answers ShellOpen for the host's own shell too: the node's owner can turn it off on the node, whatever the
   // managers say.
   bool host_shell = 8;
+  // Takes the Upgrade command; an older worker does not.
+  bool upgrade = 9;
 }
 
 enum FencingState {
@@ -369,7 +383,17 @@ message Command {
     RemoveContainer remove_container = 14;
     CephCommand ceph_command = 15;
     Cephadm cephadm = 16;
+    Upgrade upgrade = 17;
   }
+}
+
+// Replace this worker's binary with the release's (fetched from its manager with Fetch, checked against `sha256` and
+// `size`) and restart on it. Its containers keep running. The result is sent before it restarts; that the upgrade took
+// is seen in the next Hello's agent_version.
+message Upgrade {
+  string version = 1;
+  string sha256 = 2;
+  uint64 size = 3;
 }
 
 // Does nothing; proves the round trip.

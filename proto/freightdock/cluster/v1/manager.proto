@@ -33,7 +33,21 @@ service ManagerPeer {
   // A shell on a node whose stream this manager holds: the first message names the node and opens it, the rest are
   // what is typed; the shell's output (from its first ShellUp after the session id) comes back.
   rpc Shell(stream PeerShellDown) returns (stream ShellUp);
+  // A binary of the cluster's release, by its SHA-256, from a manager that has it: how each manager gets what a
+  // release names when another was given it.
+  rpc Fetch(FetchRequest) returns (stream FetchChunk);
+  // The leader asks this manager to upgrade itself to the release's binary (fetched from another manager if need be,
+  // checked against `sha256` and `size`): it stages it, answers, then restarts on it.
+  rpc Upgrade(PeerUpgradeRequest) returns (PeerUpgradeReply);
 }
+
+message PeerUpgradeRequest {
+  string version = 1;
+  string sha256 = 2;
+  uint64 size = 3;
+}
+
+message PeerUpgradeReply {}
 
 message PeerShellDown {
   // In the first message only: the node and the shell to open on it.
@@ -52,6 +66,8 @@ message HeardRequest {}
 
 message HeardReply {
   repeated HeardNode nodes = 1;
+  // The answering manager's own version.
+  string version = 2;
 }
 
 message HeardNode {

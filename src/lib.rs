@@ -71,4 +71,20 @@ mod tests {
         let peer = v1::PeerShellDown { node_id: "n1".into(), open: None, down: Some(v1::ShellDown { body: Some(v1::shell_down::Body::Resize(v1::ShellSize { cols: 80, rows: 24 })) }) };
         assert_eq!(v1::PeerShellDown::decode(peer.encode_to_vec().as_slice()).unwrap(), peer);
     }
+
+    #[test]
+    fn an_upgrade_names_its_binary_by_checksum_and_the_binary_comes_in_chunks() {
+        use prost::Message;
+        let c = v1::Command { command_id: "c1".into(), node_id: "n1".into(), config_version: 0, deadline_ms: 0, op: Some(v1::command::Op::Upgrade(v1::Upgrade { version: "1.1.0".into(), sha256: "ab".repeat(32), size: 10 })) };
+        assert_eq!(v1::Command::decode(c.encode_to_vec().as_slice()).unwrap(), c);
+        let chunk = v1::FetchChunk { data: vec![0x7f, b'E', b'L', b'F', 0, 0xff] };
+        assert_eq!(v1::FetchChunk::decode(chunk.encode_to_vec().as_slice()).unwrap(), chunk);
+        let req = v1::FetchRequest { sha256: "cd".repeat(32) };
+        assert_eq!(v1::FetchRequest::decode(req.encode_to_vec().as_slice()).unwrap(), req);
+        let peer = v1::PeerUpgradeRequest { version: "1.1.0".into(), sha256: "ef".repeat(32), size: 3 };
+        assert_eq!(v1::PeerUpgradeRequest::decode(peer.encode_to_vec().as_slice()).unwrap(), peer);
+        let heard = v1::HeardReply { nodes: vec![], version: "1.1.0".into() };
+        assert_eq!(v1::HeardReply::decode(heard.encode_to_vec().as_slice()).unwrap(), heard);
+        assert!(v1::Capabilities { upgrade: true, ..Default::default() }.upgrade);
+    }
 }

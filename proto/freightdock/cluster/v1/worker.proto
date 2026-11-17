@@ -185,6 +185,48 @@ message Heartbeat {
   TrafficReport traffic = 7;
   // How the shared storage it has made ready answers (G11.8). Absent from a worker that does not probe it.
   StorageReport storage = 8;
+  // What its disk and its shared storage folders hold, by stack: measured every few minutes, so only in the heartbeat
+  // after a new measure. Absent from a worker that does not measure.
+  UsageReport usage = 9;
+}
+
+// What a node's disk holds, by stack, and the size of each shared storage folder it has in use, as last measured.
+message UsageReport {
+  // The node's Docker, by the stack its containers carry: their writable layers and the local volumes they mount (a
+  // volume mounted by containers of several stacks counts for each).
+  repeated StackDisk stacks = 1;
+  // Images, whoever uses them.
+  uint64 images_bytes = 2;
+  // Local volumes no stack's container mounts.
+  uint64 loose_volumes_bytes = 3;
+  // The build cache.
+  uint64 build_cache_bytes = 4;
+  // The shared storage folders it has in use (a volume's "<stack>/<volume>" or the folder its Compose file names).
+  repeated FolderSize folders = 5;
+  // When it was measured, the worker's clock, unix milliseconds.
+  int64 at_ms = 6;
+  // How long the measure took.
+  uint32 took_ms = 7;
+}
+
+message StackDisk {
+  string stack = 1;
+  // The containers' writable layers.
+  uint64 containers_bytes = 2;
+  // The local named volumes they mount.
+  uint64 volumes_bytes = 3;
+}
+
+message FolderSize {
+  // The storage's name and the folder in it.
+  string storage = 1;
+  string dir = 2;
+  // What its files take on the storage (allocated blocks), symlinks not followed.
+  uint64 bytes = 3;
+  // The walk stopped early (too many files, or too long): at least this much.
+  bool partial = 4;
+  // Why it could not be measured at all, in words.
+  string error = 5;
 }
 
 // The node's view of each shared storage it has made ready for a workload, probed in the background: an NFS export

@@ -86,6 +86,8 @@ message HeardNode {
   TrafficReport traffic = 8;
   // Its shared storage's health as it last reported it (G11.8).
   StorageReport storage = 9;
+  // What its disk and shared storage folders held when last measured (the Storage page).
+  UsageReport usage = 10;
 }
 
 message JoinRequest {

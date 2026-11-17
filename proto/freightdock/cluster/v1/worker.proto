@@ -353,6 +353,14 @@ message Capabilities {
   bool host_shell = 8;
   // Takes the Upgrade command; an older worker does not.
   bool upgrade = 9;
+  // The storage drivers this node can mount itself ("nfs", "cephfs", "smb"): none in a user namespace (an
+  // unprivileged container), and each only with the kernel's support (and mount.nfs for nfs). A "path" storage is
+  // never mounted, so it is not listed. Read only when mounts_known: an older worker says nothing.
+  repeated string mounts = 10;
+  bool mounts_known = 11;
+  // Why it can mount none, when it can mount none, in words for a person ("it runs in a user namespace (an
+  // unprivileged container)").
+  string mounts_why = 12;
 }
 
 enum FencingState {

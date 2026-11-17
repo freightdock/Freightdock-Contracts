@@ -462,7 +462,9 @@ message StorageVolume {
   string driver = 3;
   string source = 4;
   string options = 5;
-  // The volume's directory inside the storage, "<stack>/<volume>".
+  // The volume's folder inside the storage: the one its Compose file names (x-freightdock.path, 1 to 8 parts of
+  // letters, digits and . _ -, none starting with a dot), else "<stack>/<volume>". Made by the worker the first time a
+  // workload with the volume starts on it, never before.
   string dir = 6;
   // cephfs: the client's key; smb: the password. Handed to the kernel with the mount and never written to the node's
   // disk or a command line. Filled in by the manager that sends the command, never kept with it.
